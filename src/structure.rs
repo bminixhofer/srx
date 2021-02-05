@@ -85,22 +85,24 @@ pub struct LanguageMap {
     pub name: String,
 }
 
-pub fn from_reader<R: Read>(reader: R) -> SRX {
-    serde_xml_rs::from_reader(reader).unwrap()
+pub fn from_reader<R: Read>(reader: R) -> Result<SRX, serde_xml_rs::Error> {
+    serde_xml_rs::from_reader(reader)
 }
 
-pub fn from_str<S: AsRef<str>>(string: S) -> SRX {
-    serde_xml_rs::from_str(string.as_ref()).unwrap()
+pub fn from_str<S: AsRef<str>>(string: S) -> Result<SRX, serde_xml_rs::Error> {
+    serde_xml_rs::from_str(string.as_ref())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use std::{fs, io};
 
     #[test]
-    fn load_example() {
-        let srx = from_str(&fs::read_to_string("data/example.xml").unwrap());
-        println!("{:#?}", srx);
+    fn load_example() -> Result<(), io::Error> {
+        let srx = from_str(&fs::read_to_string("data/example.srx")?);
+        assert!(srx.is_ok());
+
+        Ok(())
     }
 }
