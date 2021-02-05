@@ -89,8 +89,8 @@ pub fn from_reader<R: Read>(reader: R) -> SRX {
     serde_xml_rs::from_reader(reader).unwrap()
 }
 
-pub fn from_str(string: &str) -> SRX {
-    serde_xml_rs::from_str(string).unwrap()
+pub fn from_str<S: AsRef<str>>(string: S) -> SRX {
+    serde_xml_rs::from_str(string.as_ref()).unwrap()
 }
 
 #[cfg(test)]

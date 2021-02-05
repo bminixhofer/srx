@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter};
+use std::{collections::HashMap, io::Read, iter, str::FromStr};
 
 use regex::Regex;
 
@@ -45,10 +45,73 @@ impl Rule {
 }
 
 #[derive(Debug)]
-struct SRX {
+pub struct Rules {
+    rules: Vec<Rule>,
+}
+
+impl Rules {
+    pub fn split<'a>(&self, text: &'a str) -> Vec<&'a str> {
+        let mut segments = Vec::new();
+        let mut prev_index = 0;
+
+        for i in text
+            .char_indices()
+            .map(|(i, _)| i)
+            .chain(iter::once(text.len()))
+        {
+            let matched = self
+                .rules
+                .iter()
+                .find_map(|x| x.is_match(&text[..i], &text[i..]));
+            if matches!(matched, Some(true)) {
+                segments.push(&text[prev_index..i]);
+                prev_index = i;
+            }
+        }
+
+        if prev_index != text.len() {
+            segments.push(&text[prev_index..]);
+        }
+
+        segments
+    }
+}
+
+#[derive(Debug)]
+pub struct SRX {
     cascade: bool,
     map: Vec<(Regex, String)>,
     rules: HashMap<String, Vec<Rule>>,
+}
+
+impl FromStr for SRX {
+    type Err = ();
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        Ok(structure::from_str(string).into())
+    }
+}
+
+impl SRX {
+    pub fn from_reader<R: Read>(reader: R) -> Self {
+        structure::from_reader(reader).into()
+    }
+
+    pub fn language(&self, lang_code: &str) -> Rules {
+        let mut rules = Vec::new();
+
+        for (regex, language) in &self.map {
+            if regex.is_match(lang_code) {
+                rules.extend(self.rules.get(language).unwrap());
+                if !self.cascade {
+                    break;
+                }
+            }
+        }
+
+        Rules {
+            rules: rules.into_iter().cloned().collect(),
+        }
+    }
 }
 
 impl From<structure::SRX> for SRX {
@@ -89,58 +152,6 @@ impl From<structure::SRX> for SRX {
             map,
             rules,
         }
-    }
-}
-
-impl SRX {
-    fn language(&self, lang_code: &str) -> Rules {
-        let mut rules = Vec::new();
-
-        for (regex, language) in &self.map {
-            if regex.is_match(lang_code) {
-                rules.extend(self.rules.get(language).unwrap());
-                if !self.cascade {
-                    break;
-                }
-            }
-        }
-
-        Rules {
-            rules: rules.into_iter().cloned().collect(),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Rules {
-    rules: Vec<Rule>,
-}
-
-impl Rules {
-    fn split<'a>(&self, text: &'a str) -> Vec<&'a str> {
-        let mut segments = Vec::new();
-        let mut prev_index = 0;
-
-        for i in text
-            .char_indices()
-            .map(|(i, _)| i)
-            .chain(iter::once(text.len()))
-        {
-            let matched = self
-                .rules
-                .iter()
-                .find_map(|x| x.is_match(&text[..i], &text[i..]));
-            if matches!(matched, Some(true)) {
-                segments.push(&text[prev_index..i]);
-                prev_index = i;
-            }
-        }
-
-        if prev_index != text.len() {
-            segments.push(&text[prev_index..]);
-        }
-
-        segments
     }
 }
 
