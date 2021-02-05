@@ -6,6 +6,9 @@ use regex::Regex;
 mod structure;
 mod utils;
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct Language(pub String);
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Error constructing regex: {0}")]
@@ -94,9 +97,9 @@ impl Rules {
 #[derive(Debug, Clone)]
 pub struct SRX {
     cascade: bool,
-    map: Vec<(Regex, String)>,
-    rules: HashMap<String, Vec<Rule>>,
-    errors: HashMap<String, Vec<regex::Error>>,
+    map: Vec<(Regex, Language)>,
+    rules: HashMap<Language, Vec<Rule>>,
+    errors: HashMap<Language, Vec<regex::Error>>,
 }
 
 impl SRX {
@@ -123,7 +126,7 @@ impl SRX {
         }
     }
 
-    pub fn errors(&self) -> &HashMap<String, Vec<regex::Error>> {
+    pub fn errors(&self) -> &HashMap<Language, Vec<regex::Error>> {
         &self.errors
     }
 }
@@ -148,7 +151,7 @@ impl TryFrom<structure::SRX> for SRX {
             .maprules
             .maps
             .into_iter()
-            .map(|lang| Ok((utils::full_regex(&lang.pattern)?, lang.name)))
+            .map(|lang| Ok((utils::full_regex(&lang.pattern)?, Language(lang.name))))
             .collect();
         let map = map?;
 
@@ -157,7 +160,7 @@ impl TryFrom<structure::SRX> for SRX {
             .languagerules
             .rules
             .iter()
-            .map(|lang| (lang.name.clone(), Vec::new()))
+            .map(|lang| (Language(lang.name.clone()), Vec::new()))
             .collect();
 
         let rules: HashMap<_, _> = data
@@ -166,7 +169,7 @@ impl TryFrom<structure::SRX> for SRX {
             .rules
             .into_iter()
             .map(|lang| {
-                let key = lang.name;
+                let key = Language(lang.name);
                 let value: Vec<_> = lang
                     .rules
                     .into_iter()
@@ -235,7 +238,7 @@ mod tests {
                 .expect("example file is valid")
                 .language_rules("en");
 
-        // example from the spec: https://www.gala-global.org/srx-20-april-7-2008
+        // example from the spec: https://www.unicode.org/uli/pas/srx/srx20.html#AppExample
         let text =
             "The U.K. Prime Minister, Mr. Blair, was seen out with his family today. He is well.";
         assert_eq!(
