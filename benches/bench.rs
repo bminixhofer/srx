@@ -9,7 +9,7 @@ fn split<'a>(string: &'a str, rules: &Rules) -> Vec<&'a str> {
 
 fn criterion_benchmark(c: &mut Criterion) {
     let rules =
-        SRX::from_str(&fs::read_to_string("data/example.xml").expect("example file exists"))
+        SRX::from_str(&fs::read_to_string("data/example.srx").expect("example file exists"))
             .expect("example file is valid")
             .language_rules("en");
 

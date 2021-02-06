@@ -9,15 +9,18 @@ edition = "2018"
 [dependencies]
 regex = "1"
 
-thiserror = { version = "1", optional = true }
 # workaround to use a 'serde' feature which also enables 'serde_regex'
 # see https://github.com/RustCrypto/RSA/pull/41/files
 serde_crate = { package = "serde", version = "1", features = ["derive"], optional = true }
-serde-xml-rs = { version = "0.4", optional = true }
 serde_regex = {version = "1", optional = true }
+
+# used for reading from an XML in SRX format
+serde-xml-rs = { version = "0.4", optional = true }
+thiserror = { version = "1", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"
+bincode = "1"
 
 [features]
 serde = ["serde_crate", "serde_regex"]

@@ -79,7 +79,7 @@ impl Rule {
     fn match_indices<'a>(&'a self, text: &'a str) -> impl Iterator<Item = usize> + 'a {
         self.regex.captures_iter(text).map(|x| {
             x.get(1)
-                .expect("rule regex must have one capture group denoting the `after_break` part")
+                .expect("rule regex has one capture group denoting the `after_break` part")
                 .start()
         })
     }

@@ -19,6 +19,8 @@ pub enum Error {
     RegexError(#[from] regex::Error),
     #[error("Error reading XML: {0}")]
     XMLError(#[from] serde_xml_rs::Error),
+    #[error("invalid SRX: {reason}")]
+    SRXError { reason: String },
 }
 
 impl Rule {
@@ -26,11 +28,12 @@ impl Rule {
         before_break: Option<S1>,
         after_break: Option<S2>,
         do_break: bool,
-    ) -> Result<Self, regex::Error> {
-        assert!(
-            before_break.is_some() || after_break.is_some(),
-            "either `before_break` or `after_break` must be set"
-        );
+    ) -> Result<Self, Error> {
+        if before_break.is_none() && after_break.is_none() {
+            return Err(Error::SRXError {
+                reason: "either `before_break` or `after_break` must be set".into(),
+            });
+        }
 
         Ok(Rule {
             regex: Regex::new(&format!(
@@ -95,6 +98,7 @@ impl TryFrom<schema::SRX> for SRX {
             .into_iter()
             .map(|lang| {
                 let key = Language(lang.name);
+
                 let value: Vec<_> = lang
                     .rules
                     .into_iter()
@@ -121,6 +125,13 @@ impl TryFrom<schema::SRX> for SRX {
                 (key, value)
             })
             .collect();
+
+        if let Some(entry) = map
+            .iter()
+            .find(|entry| !rules.iter().any(|rule| *rule.0 == entry.language))
+        {
+            return Err(Error::SRXError { reason: format!("<languagerules> must have an entry for each language in <languagemap>. Did not find entry for {}", entry.language.0)});
+        }
 
         Ok(SRX {
             cascade,
@@ -243,5 +254,22 @@ mod tests {
             srx.language_rules("en").rules.len(),
             srx.language_rules("fr").rules.len()
         );
+    }
+
+    #[test]
+    fn serde_works() -> Result<(), bincode::Error> {
+        let srx =
+            SRX::from_str(&fs::read_to_string("data/example.srx").expect("example file exists"))
+                .expect("example file is valid");
+
+        let buf = bincode::serialize(&srx)?;
+        let deserialized_srx: SRX = bincode::deserialize(&buf)?;
+
+        // we can't actually compare them but some basic comparison of fields is enough
+        assert_eq!(srx.map.len(), deserialized_srx.map.len());
+        assert_eq!(srx.rules.len(), deserialized_srx.rules.len());
+        assert_eq!(srx.cascade, deserialized_srx.cascade);
+
+        Ok(())
     }
 }
