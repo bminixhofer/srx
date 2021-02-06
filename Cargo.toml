@@ -1,6 +1,6 @@
 [package]
 name = "srx"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Benjamin Minixhofer <bminixhofer@gmail.com>"]
 edition = "2018"
 description = "A mostly compliant Rust implementation of the Segmentation Rules eXchange (SRX) 2.0 standard for text segmentation."
@@ -33,3 +33,9 @@ from_xml = ["serde", "serde-xml-rs", "thiserror"]
 [[bench]]
 name = "bench"
 harness = false
+
+# docs.rs-specific configuration
+[package.metadata.docs.rs]
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

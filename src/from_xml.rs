@@ -15,6 +15,7 @@ pub fn string_to_bool(string: &str) -> Result<bool, Error> {
 }
 
 #[derive(Debug, Error)]
+#[cfg_attr(docsrs, doc(cfg(feature = "from_xml")))]
 #[cfg(feature = "from_xml")]
 pub enum Error {
     #[error("Error constructing regex: {0}")]
@@ -31,6 +32,7 @@ impl Rule {
     /// # Errors
     ///
     /// If neither `before_break` nor `after_break` is set.
+    #[cfg_attr(docsrs, doc(cfg(feature = "from_xml")))]
     pub fn new<S1: AsRef<str>, S2: AsRef<str>>(
         before_break: Option<S1>,
         after_break: Option<S2>,
@@ -60,6 +62,7 @@ impl SRX {
     ///
     /// * If the file is not in valid SRX format.
     /// * If an unsupported rule is encountered in the `<maprules>`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "from_xml")))]
     pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
         schema::from_reader(reader)
             .map_err(Error::from)
@@ -67,6 +70,7 @@ impl SRX {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "from_xml")))]
 impl FromStr for SRX {
     type Err = Error;
     fn from_str(string: &str) -> Result<Self, Self::Err> {

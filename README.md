@@ -1,5 +1,9 @@
 # SRX
 
+[![Crates.io](https://img.shields.io/crates/v/srx)](https://crates.io/crates/srx)
+[![Docs.rs](https://docs.rs/srx/badge.svg)](https://docs.rs/srx)
+![MIT OR Apache 2.0 license](https://img.shields.io/crates/l/srx)
+
 A simple and reasonably fast Rust implementation of the [Segmentation Rules eXchange 2.0 standard](https://www.unicode.org/uli/pas/srx/srx20.html) for text segmentation. `srx` is *not* fully compliant with the standard.
 
 This crate is intended for segmentation of plaintext so markup information (`<formathandle>` and `segmentsubflows`) is ignored.

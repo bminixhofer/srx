@@ -42,7 +42,7 @@
 //! which does not comply with the standard by e. g. using look-ahead and look-behind, `srx`
 //! ignores `<rule>` elements with invalid regular expressions and provides information about
 //! them via the [SRX::errors] function.
-
+#![cfg_attr(docsrs, feature(doc_cfg))] // see https://stackoverflow.com/a/61417700
 #[cfg(feature = "serde")]
 extern crate serde_crate as serde;
 #[cfg(feature = "serde")]
