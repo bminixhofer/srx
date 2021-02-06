@@ -1,50 +1,81 @@
-use std::{collections::HashMap, convert::TryFrom, io::Read, str::FromStr};
-use thiserror::Error;
+//! A simple and reasonably fast Rust implementation of the
+//! [Segmentation Rules eXchange 2.0 standard](https://www.unicode.org/uli/pas/srx/srx20.html)
+//! for text segmentation. `srx` is *not* fully compliant with the standard.
+//!
+//! This crate is intended for segmentation of plaintext so markup information (`<formathandle>` and `segmentsubflows`)
+//! is ignored.
+//!
+//! Not complying with the SRX spec, overlapping matches of the same `<rule>` are not found which could
+//! lead to different behavior in a few edge cases.
+//!
+//! ## Example
+//!
+//! ```
+//! use std::{fs, str::FromStr};
+//! use srx::SRX;
+//!
+//! let srx = SRX::from_str(&fs::read_to_string("data/segment.srx").unwrap())?;
+//! let english_rules = srx.language_rules("en");
+//!
+//! assert_eq!(
+//!     english_rules.split("e.g. U.K. and Mr. do not split. SRX is a rule-based format."),
+//!     vec!["e.g. U.K. and Mr. do not split. ", "SRX is a rule-based format."]
+//! );
+//! # Ok::<(), srx::Error>(())
+//! ```
+//!
+//! ## A note on regular expressions
+//!
+//! This crate uses the [`regex` crate](https://github.com/rust-lang/regex) for parsing and executing
+//! regular expressions. The `regex` crate is mostly compatible with the
+//! [regular expression standard](https://www.unicode.org/uli/pas/srx/srx20.html#Intro_RegExp) from the SRX specification.
+//! However, some metacharacters such as `\Q` and `\E` are not supported.
+//!
+//! To still be able to use files containing unsupported rules and to parse useful SRX files
+//! such as
+//! [`segment.srx` from LanguageTool](https://github.com/languagetool-org/languagetool/blob/master/languagetool-core/src/main/resources/org/languagetool/resource/segment.srx)
+//! which does not comply with the standard by e. g. using look-ahead and look-behind, `srx`
+//! ignores `<rule>` elements with invalid regular expressions and provides information about
+//! them via the [SRX::errors] function.
+
+#[cfg(feature = "serde")]
+extern crate serde_crate as serde;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use std::collections::HashMap;
 
 use regex::Regex;
 
-mod structure;
+#[cfg(feature = "from_xml")]
+mod from_xml;
+#[cfg(feature = "from_xml")]
 mod utils;
+#[cfg(feature = "from_xml")]
+pub use from_xml::Error;
 
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Language(pub String);
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Error constructing regex: {0}")]
-    RegexError(#[from] regex::Error),
-    #[error("Error reading XML: {0}")]
-    XMLError(#[from] serde_xml_rs::Error),
-}
-
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 struct Rule {
+    #[cfg_attr(feature = "serde", serde(with = "serde_regex"))]
     regex: Regex,
     do_break: bool,
 }
 
 impl Rule {
-    fn new<S1: AsRef<str>, S2: AsRef<str>>(
-        before_break: Option<S1>,
-        after_break: Option<S2>,
-        do_break: bool,
-    ) -> Result<Self, regex::Error> {
-        assert!(
-            before_break.is_some() || after_break.is_some(),
-            "either `before_break` or `after_break` must be set"
-        );
-
-        Ok(Rule {
-            regex: Regex::new(&format!(
-                "{}({})",
-                before_break.as_ref().map_or("", |x| x.as_ref()),
-                after_break.as_ref().map_or("", |x| x.as_ref())
-            ))?,
-            do_break,
-        })
-    }
-
     fn match_indices<'a>(&'a self, text: &'a str) -> impl Iterator<Item = usize> + 'a {
         self.regex.captures_iter(text).map(|x| {
             x.get(1)
@@ -58,6 +89,11 @@ impl Rule {
     }
 }
 
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 #[derive(Debug, Clone, Default)]
 pub struct Rules {
     rules: Vec<Rule>,
@@ -94,27 +130,38 @@ impl Rules {
     }
 }
 
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
+#[derive(Debug, Clone)]
+struct LanguageRegex {
+    #[cfg_attr(feature = "serde", serde(with = "serde_regex"))]
+    regex: Regex,
+    language: Language,
+}
+
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 #[derive(Debug, Clone)]
 pub struct SRX {
     cascade: bool,
-    map: Vec<(Regex, Language)>,
+    map: Vec<LanguageRegex>,
     rules: HashMap<Language, Vec<Rule>>,
-    errors: HashMap<Language, Vec<regex::Error>>,
+    errors: HashMap<Language, Vec<String>>,
 }
 
 impl SRX {
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
-        structure::from_reader(reader)
-            .map_err(Error::from)
-            .and_then(SRX::try_from)
-    }
-
-    pub fn language_rules(&self, lang_code: &str) -> Rules {
+    pub fn language_rules<S: AsRef<str>>(&self, lang_code: S) -> Rules {
         let mut rules = Vec::new();
 
-        for (regex, language) in &self.map {
-            if regex.is_match(lang_code) {
-                rules.extend(self.rules.get(language).expect("languagerulename in <languagemap> must have a corresponding entry in <languagerules>"));
+        for item in &self.map {
+            if item.regex.is_match(lang_code.as_ref()) {
+                rules.extend(self.rules.get(&item.language).expect("languagerulename in <languagemap> must have a corresponding entry in <languagerules>"));
                 if !self.cascade {
                     break;
                 }
@@ -126,103 +173,15 @@ impl SRX {
         }
     }
 
-    pub fn errors(&self) -> &HashMap<Language, Vec<regex::Error>> {
+    pub fn errors(&self) -> &HashMap<Language, Vec<String>> {
         &self.errors
-    }
-}
-
-impl FromStr for SRX {
-    type Err = Error;
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        structure::from_str(string)
-            .map_err(Error::from)
-            .and_then(SRX::try_from)
-    }
-}
-
-impl TryFrom<structure::SRX> for SRX {
-    type Error = Error;
-
-    fn try_from(data: structure::SRX) -> Result<Self, Self::Error> {
-        let cascade = structure::string_to_bool(&data.header.cascade);
-
-        let map: Result<Vec<_>, Error> = data
-            .body
-            .maprules
-            .maps
-            .into_iter()
-            .map(|lang| Ok((utils::full_regex(&lang.pattern)?, Language(lang.name))))
-            .collect();
-        let map = map?;
-
-        let mut errors: HashMap<_, _> = data
-            .body
-            .languagerules
-            .rules
-            .iter()
-            .map(|lang| (Language(lang.name.clone()), Vec::new()))
-            .collect();
-
-        let rules: HashMap<_, _> = data
-            .body
-            .languagerules
-            .rules
-            .into_iter()
-            .map(|lang| {
-                let key = Language(lang.name);
-                let value: Vec<_> = lang
-                    .rules
-                    .into_iter()
-                    .filter_map(|rule| {
-                        let rule = Rule::new(
-                            rule.beforebreak,
-                            rule.afterbreak,
-                            structure::string_to_bool(&rule.do_break),
-                        );
-
-                        match rule {
-                            Ok(rule) => Some(rule),
-                            Err(error) => {
-                                errors
-                                    .get_mut(&key)
-                                    .expect("error map has a key for each language")
-                                    .push(error);
-                                None
-                            }
-                        }
-                    })
-                    .collect();
-
-                (key, value)
-            })
-            .collect();
-
-        Ok(SRX {
-            cascade,
-            map,
-            rules,
-            errors,
-        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-
-    #[test]
-    fn getting_language_rules_works() {
-        let srx =
-            SRX::from_str(&fs::read_to_string("data/example.srx").expect("example file exists"))
-                .expect("example file is valid");
-
-        assert!(!srx.language_rules("en").rules.is_empty());
-        assert_ne!(
-            srx.language_rules("en").rules.len(),
-            srx.language_rules("fr").rules.len()
-        );
-    }
+    use std::{fs, str::FromStr};
 
     #[test]
     fn match_indices_correct() {

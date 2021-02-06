@@ -8,12 +8,20 @@ edition = "2018"
 
 [dependencies]
 regex = "1"
-thiserror = "1"
-serde = { version = "1", features = ["derive"] }
-serde-xml-rs = "0.4"
+
+thiserror = { version = "1", optional = true }
+# workaround to use a 'serde' feature which also enables 'serde_regex'
+# see https://github.com/RustCrypto/RSA/pull/41/files
+serde_crate = { package = "serde", version = "1", features = ["derive"], optional = true }
+serde-xml-rs = { version = "0.4", optional = true }
+serde_regex = {version = "1", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"
+
+[features]
+serde = ["serde_crate", "serde_regex"]
+from_xml = ["serde", "serde-xml-rs", "thiserror"]
 
 [[bench]]
 name = "bench"
