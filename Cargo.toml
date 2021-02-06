@@ -3,6 +3,10 @@ name = "srx"
 version = "0.1.0"
 authors = ["Benjamin Minixhofer <bminixhofer@gmail.com>"]
 edition = "2018"
+description = "A mostly compliant Rust implementation of the Segmentation Rules eXchange (SRX) 2.0 standard for text segmentation."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/bminixhofer/srx"
+documentation = "https://docs.rs/srx"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
