@@ -145,6 +145,14 @@ impl Rules {
 
         segments
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.rules.len()
+    }
 }
 
 /// An entry of the `<maprules>` element.
