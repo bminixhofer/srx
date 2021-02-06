@@ -4,11 +4,13 @@ use super::{utils, Language, LanguageRegex, Rule, SRX};
 use regex::Regex;
 use thiserror::Error;
 
-pub fn string_to_bool(string: &str) -> bool {
+pub fn string_to_bool(string: &str) -> Result<bool, Error> {
     match string {
-        "yes" => true,
-        "no" => false,
-        _ => panic!("unexpected value {}", string),
+        "yes" => Ok(true),
+        "no" => Ok(false),
+        x => Err(Error::SRXError {
+            reason: format!("unexpected boolean value '{}'. Expected 'yes' or 'no'.", x),
+        }),
     }
 }
 
@@ -24,6 +26,11 @@ pub enum Error {
 }
 
 impl Rule {
+    /// Creates a new ruel.
+    ///
+    /// # Errors
+    ///
+    /// If neither `before_break` nor `after_break` is set.
     pub fn new<S1: AsRef<str>, S2: AsRef<str>>(
         before_break: Option<S1>,
         after_break: Option<S2>,
@@ -47,6 +54,12 @@ impl Rule {
 }
 
 impl SRX {
+    /// Creates a new SRX struct from a reader.
+    ///
+    /// # Errors
+    ///
+    /// * If the file is not in valid SRX format.
+    /// * If an unsupported rule is encountered in the `<maprules>`.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
         schema::from_reader(reader)
             .map_err(Error::from)
@@ -67,7 +80,7 @@ impl TryFrom<schema::SRX> for SRX {
     type Error = Error;
 
     fn try_from(data: schema::SRX) -> Result<Self, Self::Error> {
-        let cascade = string_to_bool(&data.header.cascade);
+        let cascade = string_to_bool(&data.header.cascade)?;
 
         let map: Result<Vec<_>, Error> = data
             .body
@@ -91,7 +104,7 @@ impl TryFrom<schema::SRX> for SRX {
             .map(|lang| (Language(lang.name.clone()), Vec::new()))
             .collect();
 
-        let rules: HashMap<_, _> = data
+        let rules: Result<HashMap<_, _>, Error> = data
             .body
             .languagerules
             .rules
@@ -102,12 +115,17 @@ impl TryFrom<schema::SRX> for SRX {
                 let value: Vec<_> = lang
                     .rules
                     .into_iter()
-                    .filter_map(|rule| {
-                        let rule = Rule::new(
+                    .map(|rule| {
+                        Ok((
                             rule.beforebreak,
                             rule.afterbreak,
-                            string_to_bool(&rule.do_break),
-                        );
+                            string_to_bool(&rule.do_break)?,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?
+                    .into_iter()
+                    .filter_map(|(before_break, after_break, do_break)| {
+                        let rule = Rule::new(before_break, after_break, do_break);
 
                         match rule {
                             Ok(rule) => Some(rule),
@@ -122,9 +140,10 @@ impl TryFrom<schema::SRX> for SRX {
                     })
                     .collect();
 
-                (key, value)
+                Ok((key, value))
             })
             .collect();
+        let rules = rules?;
 
         if let Some(entry) = map
             .iter()

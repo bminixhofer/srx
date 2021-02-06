@@ -24,6 +24,11 @@
 //! # Ok::<(), srx::Error>(())
 //! ```
 //!
+//! ## Features
+//!
+//! - `serde`: Serde serialization and deserialization support for [SRX].
+//! - `from_xml`: [SRX::from_reader] method and [std::str::FromStr] implementation to load from an XML file in SRX format.
+//!
 //! ## A note on regular expressions
 //!
 //! This crate uses the [`regex` crate](https://github.com/rust-lang/regex) for parsing and executing
@@ -54,6 +59,7 @@ mod utils;
 #[cfg(feature = "from_xml")]
 pub use from_xml::Error;
 
+/// Newtype denoting a language (`languagerulename` attribute in SRX).
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -62,6 +68,9 @@ pub use from_xml::Error;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Language(pub String);
 
+/// A single SRX rule. In SRX, consists of one `before_break` and one `after_break` Regex.
+/// For efficiency this crate compiles these regexes into one regex of the form `before_break(after_break)`
+/// and uses the start of the first capture group as the split index.
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -76,6 +85,8 @@ struct Rule {
 }
 
 impl Rule {
+    /// Gets all byte indices in the text at which this rule matches.
+    /// Contrary to the SRX 2.0 spec this does not find overlapping matches.
     fn match_indices<'a>(&'a self, text: &'a str) -> impl Iterator<Item = usize> + 'a {
         self.regex.captures_iter(text).map(|x| {
             x.get(1)
@@ -84,11 +95,16 @@ impl Rule {
         })
     }
 
+    /// Whether this rule breaks or prevents breaking.
     fn do_break(&self) -> bool {
         self.do_break
     }
 }
 
+/// An ordered set of rules.
+/// Rules are executed in order.
+/// Once a rule matches on an index, no other rule can match at the same index.
+/// Each rule either breaks (i. e. splits the text at this index) or prevents breaking.
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -100,6 +116,7 @@ pub struct Rules {
 }
 
 impl Rules {
+    /// Split a text into segments.
     pub fn split<'a>(&self, text: &'a str) -> Vec<&'a str> {
         let mut segments = Vec::new();
 
@@ -130,6 +147,8 @@ impl Rules {
     }
 }
 
+/// An entry of the `<maprules>` element.
+/// Associates a regex with a [Language].
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -142,6 +161,8 @@ struct LanguageRegex {
     language: Language,
 }
 
+/// The SRX root.
+/// Does not execute rules on is own.
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -156,6 +177,11 @@ pub struct SRX {
 }
 
 impl SRX {
+    /// Gets the rules for a language code by
+    /// - aggregating rules from all [Language]s with a matching `<languagepattern>` (if the SRX is set to be cascading)
+    /// - finding the first matching `<languagepattern>` (if the SRX is set to be not cascading)
+    ///
+    /// Result should be cached instead of calling this repeatedly as it clones the rules.
     pub fn language_rules<S: AsRef<str>>(&self, lang_code: S) -> Rules {
         let mut rules = Vec::new();
 
@@ -173,6 +199,7 @@ impl SRX {
         }
     }
 
+    /// Maps [Language]s to a vector of string representations of errors which occured during parsing regular expressions for this language.
     pub fn errors(&self) -> &HashMap<Language, Vec<String>> {
         &self.errors
     }
