@@ -1,6 +1,6 @@
 [package]
 name = "srx"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Benjamin Minixhofer <bminixhofer@gmail.com>"]
 edition = "2018"
 description = "A mostly compliant Rust implementation of the Segmentation Rules eXchange (SRX) 2.0 standard for text segmentation."
