@@ -124,10 +124,12 @@ impl Rules {
 
         for rule in &self.rules {
             for index in rule.match_indices(text) {
-                if let Some(br) = mask.get_mut(index) {
-                    if br.is_none() {
-                        *br = Some(rule.do_break());
-                    }
+                if index >= text.len() {
+                    continue;
+                }
+
+                if mask[index].is_none() {
+                    mask[index] = Some(rule.do_break());
                 }
             }
         }
@@ -244,6 +246,16 @@ mod tests {
                 " He is well."
             ]
         );
+    }
+
+    #[test]
+    fn ignores_last_match_index() {
+        let rules =
+            SRX::from_str(&fs::read_to_string("data/segment.srx").expect("example file exists"))
+                .expect("example file is valid")
+                .language_rules("en");
+
+        rules.split("Hello! ");
     }
 
     #[test]
