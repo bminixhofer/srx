@@ -124,8 +124,10 @@ impl Rules {
 
         for rule in &self.rules {
             for index in rule.match_indices(text) {
-                if mask[index].is_none() {
-                    mask[index] = Some(rule.do_break());
+                if let Some(br) = mask.get_mut(index) {
+                    if br.is_none() {
+                        *br = Some(rule.do_break());
+                    }
                 }
             }
         }
