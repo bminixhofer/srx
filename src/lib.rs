@@ -18,7 +18,7 @@
 //! let english_rules = srx.language_rules("en");
 //!
 //! assert_eq!(
-//!     english_rules.split("e.g. U.K. and Mr. do not split. SRX is a rule-based format."),
+//!     english_rules.split("e.g. U.K. and Mr. do not split. SRX is a rule-based format.").collect::<Vec<_>>(),
 //!     vec!["e.g. U.K. and Mr. do not split. ", "SRX is a rule-based format."]
 //! );
 //! # Ok::<(), srx::Error>(())
@@ -48,7 +48,7 @@ extern crate serde_crate as serde;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use regex::Regex;
 
@@ -88,10 +88,11 @@ impl Rule {
     /// Gets all byte indices in the text at which this rule matches.
     /// Contrary to the SRX 2.0 spec this does not find overlapping matches.
     fn match_indices<'a>(&'a self, text: &'a str) -> impl Iterator<Item = usize> + 'a {
-        self.regex.captures_iter(text).map(|x| {
-            x.get(1)
-                .expect("rule regex has one capture group denoting the `after_break` part")
-                .start()
+        self.regex.captures_iter(text).filter_map(|x| {
+            // generally it is guaranteed that a regex has
+            // at least one match, but be lenient about
+            // errors in the srx xml files and drop those without
+            x.get(1).map(|x| x.start())
         })
     }
 
@@ -116,38 +117,53 @@ pub struct Rules {
 }
 
 impl Rules {
-    /// Split a text into segments.
-    pub fn split<'a>(&self, text: &'a str) -> Vec<&'a str> {
+    /// Obtain the ranges for text segments. Guaranteed to be at character bounds.
+    pub fn split_ranges(&self, text: &str) -> Vec<Range<usize>> {
         let mut segments = Vec::new();
 
-        let mut mask: Vec<Option<bool>> = vec![None; text.len()];
+        // TODO use a proper tri-state enum here
+        let mut masked_bytes: Vec<Option<bool>> = vec![None; text.len()];
 
-        for rule in &self.rules {
-            for index in rule.match_indices(text) {
-                if index >= text.len() {
-                    continue;
+        'outer: for rule in &self.rules {
+            for byte_index in rule.match_indices(text) {
+
+                if byte_index >= text.len() {
+                    continue 'outer;
                 }
 
-                if mask[index].is_none() {
-                    mask[index] = Some(rule.do_break());
+                if masked_bytes[byte_index].is_none() {
+                    masked_bytes[byte_index] = Some(rule.do_break());
                 }
             }
         }
 
-        let mut prev_index = 0;
+        let mut prev_byte_pos = 0;
 
-        for (i, mask_val) in (0..text.len()).zip(mask) {
-            if let Some(true) = mask_val {
-                segments.push(&text[prev_index..i]);
-                prev_index = i;
+        // Iterate over characters, we don't want no half characters in the output ranges
+        for (byte_pos, _c) in text.char_indices() {
+            if let Some(Some(true)) = masked_bytes.get(byte_pos) {
+                segments.push(prev_byte_pos..byte_pos);
+                prev_byte_pos = byte_pos;
             }
         }
 
-        if prev_index != text.len() {
-            segments.push(&text[prev_index..]);
+        // Deal with the trailing element, which is by definition
+        // not required to be suffixed by a gap char.
+        if text[prev_byte_pos..].chars().next().is_some() {
+            segments.push(prev_byte_pos..text.len());
         }
 
         segments
+    }
+
+    /// Split text into sentences.
+    pub fn split<'a, 'b>(&self, text: &'a str) -> impl Iterator<Item = &'a str> + 'b
+    where
+        'a: 'b,
+    {
+        self.split_ranges(text)
+            .into_iter()
+            .map(move |range| &text[range])
     }
 
     pub fn is_empty(&self) -> bool {
@@ -199,16 +215,14 @@ impl SRX {
 
         for item in &self.map {
             if item.regex.is_match(lang_code.as_ref()) {
-                rules.extend(self.rules.get(&item.language).expect("languagerulename in <languagemap> must have a corresponding entry in <languagerules>"));
+                rules.extend(self.rules.get(&item.language).expect("languagerulename in <languagemap> must have a corresponding entry in <languagerules>").iter().cloned());
                 if !self.cascade {
                     break;
                 }
             }
         }
 
-        Rules {
-            rules: rules.into_iter().cloned().collect(),
-        }
+        Rules { rules }
     }
 
     /// Maps [Language]s to a vector of string representations of errors which occured during parsing regular expressions for this language.
@@ -226,7 +240,10 @@ mod tests {
     fn match_indices_correct() {
         let rule = Rule::new(Some("abc"), Some("d+fg"), true).expect("test rule is valid");
 
-        assert_eq!(rule.match_indices("abcddfg").collect::<Vec<_>>(), vec![3]);
+        assert_eq!(
+            rule.match_indices("abcddfgxxx").collect::<Vec<_>>(),
+            vec![3_usize]
+        );
     }
 
     #[test]
@@ -240,10 +257,26 @@ mod tests {
         let text =
             "The U.K. Prime Minister, Mr. Blair, was seen out with his family today. He is well.";
         assert_eq!(
-            rules.split(text),
+            rules.split(text).collect::<Vec<_>>(),
             vec![
                 "The U.K. Prime Minister, Mr. Blair, was seen out with his family today.",
                 " He is well."
+            ]
+        );
+    }
+    #[test]
+    fn example_splits_correct_multi_emoji() {
+        let rules =
+            SRX::from_str(&fs::read_to_string("data/segment.srx").expect("example file exists"))
+                .expect("example file is valid")
+                .language_rules("en");
+
+        let text = "e.g. U.K. and Mr. do not split. SRX is a 👒🍏🍱-based format 🐱";
+        assert_eq!(
+            rules.split(text).collect::<Vec<_>>(),
+            vec![
+                "e.g. U.K. and Mr. do not split. ",
+                "SRX is a 👒🍏🍱-based format 🐱"
             ]
         );
     }
@@ -255,7 +288,7 @@ mod tests {
                 .expect("example file is valid")
                 .language_rules("en");
 
-        rules.split("Hello! ");
+        let _ = rules.split("Hello! ").collect::<Vec<_>>();
     }
 
     #[test]

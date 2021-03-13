@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use srx::{Rules, SRX};
 
 fn split<'a>(string: &'a str, rules: &Rules) -> Vec<&'a str> {
-    rules.split(string)
+    rules.split(string).collect::<Vec<_>>()
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -15,12 +15,12 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("split string", |b| {
         b.iter(|| {
-            split(
+            let _ = split(
                 black_box(
                     "The U.K. Prime Minister, Mr. Blair, was seen out with his family today.",
                 ),
                 &rules,
-            )
+            );
         })
     });
 }
