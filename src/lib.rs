@@ -156,7 +156,7 @@ impl Rules {
         segments
     }
 
-    /// Split text into sentences.
+    /// Split text into segments.
     pub fn split<'a, 'b>(&self, text: &'a str) -> impl Iterator<Item = &'a str> + 'b
     where
         'a: 'b,
