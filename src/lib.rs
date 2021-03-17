@@ -141,7 +141,7 @@ impl Rules {
 
         // Iterate over characters, we don't want no half characters in the output ranges
         for (byte_pos, _c) in text.char_indices() {
-            if let Some(Some(true)) = masked_bytes.get(byte_pos) {
+            if let Some(true) = masked_bytes[byte_pos] {
                 segments.push(prev_byte_pos..byte_pos);
                 prev_byte_pos = byte_pos;
             }
