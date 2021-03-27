@@ -1,6 +1,6 @@
 [package]
 name = "srx"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Benjamin Minixhofer <bminixhofer@gmail.com>"]
 edition = "2018"
 description = "A mostly compliant Rust implementation of the Segmentation Rules eXchange (SRX) 2.0 standard for text segmentation."
@@ -16,7 +16,7 @@ regex = "1"
 # workaround to use a 'serde' feature which also enables 'serde_regex'
 # see https://github.com/RustCrypto/RSA/pull/41/files
 serde_crate = { package = "serde", version = "1", features = ["derive"], optional = true }
-serde_regex = {version = "1", optional = true }
+serde_regex = { version = "1", optional = true }
 
 # used for reading from an XML in SRX format
 serde-xml-rs = { version = "0.4", optional = true }
