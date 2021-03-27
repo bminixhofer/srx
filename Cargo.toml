@@ -25,6 +25,8 @@ thiserror = { version = "1", optional = true }
 [dev-dependencies]
 criterion = "0.3"
 bincode = "1"
+quickcheck = "1"
+quickcheck_macros = "1"
 
 [features]
 serde = ["serde_crate", "serde_regex"]

@@ -126,7 +126,6 @@ impl Rules {
 
         'outer: for rule in &self.rules {
             for byte_index in rule.match_indices(text) {
-
                 if byte_index >= text.len() {
                     continue 'outer;
                 }
@@ -234,7 +233,21 @@ impl SRX {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quickcheck_macros::quickcheck;
     use std::{fs, str::FromStr};
+
+    #[quickcheck]
+    fn length_invariant(text: String) {
+        let rules =
+            SRX::from_str(&fs::read_to_string("data/example.srx").expect("example file exists"))
+                .expect("example file is valid")
+                .language_rules("en");
+
+        assert_eq!(
+            text.len(),
+            rules.split(&text).fold(0, |acc, x| acc + x.len())
+        );
+    }
 
     #[test]
     fn match_indices_correct() {
