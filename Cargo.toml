@@ -12,6 +12,7 @@ documentation = "https://docs.rs/srx"
 
 [dependencies]
 regex = "1"
+clap = { version = "3.1.18", features = ["derive"] }
 
 # workaround to use a 'serde' feature which also enables 'serde_regex'
 # see https://github.com/RustCrypto/RSA/pull/41/files
