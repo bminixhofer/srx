@@ -10,7 +10,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
+    /// ISO-639-1, 2 char language code
     #[clap(short, long, default_value="en")]
     language: String,
     #[clap(short, long)]
@@ -19,6 +19,8 @@ struct Args {
     output: String,
     #[clap(short, long)]
     srxfile: String,
+    #[clap(short, long)]
+    verbose: bool,
 }
 
 fn main() -> io::Result<()> {
@@ -28,10 +30,16 @@ fn main() -> io::Result<()> {
     let file = File::create(args.output)?;
     let mut file = LineWriter::new(file);
     // Load SRX rules from file
-    let rules =
+    let srx =
         SRX::from_str(&read_to_string(args.srxfile).expect("rules file exists"))
-            .expect("srx rule file is valid")
-            .language_rules(args.language);
+            .expect("srx rule file is valid");
+    if args.verbose {
+        println!("SRX rules errors while parsing with regex, by language: {:?}", srx.errors());
+    }
+    let rules = srx.language_rules(args.language);
+    if args.verbose {
+        println!("Using these rules for the selected language: {:?}", rules);
+    }
 
     // Read each input file line (it could be a whole document)
     if let Ok(lines) = read_lines(args.input) {
