@@ -182,7 +182,7 @@ mod schema {
     pub struct Header {
         pub segmentsubflows: Option<String>,
         pub cascade: String,
-        #[serde(rename = "formathandle")]
+        #[serde(rename = "formathandle", default)]
         pub handles: Vec<FormatHandle>,
     }
 
