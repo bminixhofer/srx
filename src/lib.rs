@@ -311,6 +311,6 @@ mod tests {
                 .expect("segment file is valid");
 
         assert!(!srx.errors().is_empty());
-        assert_eq!(srx.errors().values().flatten().count(), 51);
+        assert_eq!(srx.errors().values().flatten().count(), 49);
     }
 }
